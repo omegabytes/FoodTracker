@@ -53,13 +53,25 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
     func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCellWithIdentifier("Cell") as UITableViewCell
         
-        var foodName:String 
+        var foodName:String
         
-        if self.searchController.active {
-            foodName = filteredSuggestedSearchFoods[indexPath.row]
-        } else {
-            foodName = suggestedSearchFoods[indexPath.row]
+        let selectedScopeButtonIndex = self.searchController.searchBar.selectedScopeButtonIndex
+        
+        if selectedScopeButtonIndex == 0 {
+            if self.searchController.active {
+                foodName = filteredSuggestedSearchFoods[indexPath.row]
+            }
+            else {
+                foodName = suggestedSearchFoods[indexPath.row]
+            }
         }
+        else if selectedScopeButtonIndex == 1 {
+            foodName = apiSearchForFoods[indexPath.row].name
+        }
+        else {
+            foodName = ""
+        }
+        
         
         cell.textLabel?.text = foodName
         cell.accessoryType = UITableViewCellAccessoryType.DisclosureIndicator
@@ -77,96 +89,130 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
             } else {
                 return self.suggestedSearchFoods.count
             }
-        } else if selectedScopeButtonIndex == 1 {
+        }
+        else if selectedScopeButtonIndex == 1 {
             return self.apiSearchForFoods.count
-        }else {
+        }
+        else {
             return 0
         }
     }
     
+    // MARK - UITableViewDelegate
     
-}
-
-// MARK - UISearchResultsUpdatingDelegate
-
-func updateSearchResultsForSearchController(searchController: UISearchController) {
-    let searchString = self.searchController.searchBar.text
-    let selectedScopeButtonIndex = self.searchController.searchBar.selectedScopeButtonIndex
-    self.filterContentForSearch(searchString, scope: selectedScopeButtonIndex)
-    self.tableView.reloadData()
-    
-}
-
-// MARK- UISearchBarDelegate
-
-func searchBarSearchButtonClicked(searchBar: UISearchBar) {
-    self.searchController.searchBar.selectedScopeButtonIndex = 1
-    makeRequest(searchBar.text)
-}
-
-func filterContentForSearch(searchText: String, scope: Int) {
-    self.filteredSuggestedSearchFoods = self.suggestedSearchFoods.filter({ (food : String) -> Bool in
-        var foodMatch = food.rangeOfString(searchText)
-        return foodMatch != nil
-    })
-}
-
-func makeRequest (searchString: String) {
-    // How to make a HTTP get request
-    //
-    //        let url = NSURL(string: "https://api.nutritionix.com/v1_1/search/\(searchString)?results=0%3A20&cal_min=0&cal_max=50000&fields=item_name%2Cbrand_name%2Citem_id%2Cbrand_id&appId=\(kAppId)&appKey=\(kAppKey)")
-    //        let task = NSURLSession.sharedSession().dataTaskWithURL(url!, completionHandler: { (data, response, error) -> Void in
-    //
-    //            var stringData = NSString(data: data, encoding: NSUTF8StringEncoding)
-    //            println(stringData)
-    //            println(response)
-    //        })
-    //        task.resume()
-    
-    var request = NSMutableURLRequest(URL: NSURL(string: "https://api.nutritionix.com/v1_1/search/")!)
-    let session = NSURLSession.sharedSession()
-    request.HTTPMethod = "POST"
-    
-    var params = [
-        "appId" : kAppId,
-        "appKey" : kAppKey,
-        "fields" : ["item_name", "brand_name", "keywords", "usda_fields"],
-        "limit" : "50",
-        "query" : searchString,
-        "filters" : ["exists" : ["usda_fields" : "true"]]]
-    
-    var error: NSError?
-    request.HTTPBody = NSJSONSerialization.dataWithJSONObject(params, options: nil, error: &error)
-    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.addValue("applicaiton/json", forHTTPHeaderField: "Accept")
-    
-    var task = session.dataTaskWithRequest(request, completionHandler: { (data, response, err) -> Void in
+    func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
         
-        //            var stringData = NSString(data: data, encoding: NSUTF8StringEncoding)
-        //            println(stringData)
-        var conversionError: NSError?
-        var jsonDictionary = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableLeaves, error: &conversionError) as? NSDictionary
-        println(jsonDictionary)
+        let selectedScopeButtonIndex = self.searchController.searchBar.selectedScopeButtonIndex
         
-        if conversionError != nil {
-            println(conversionError!.localizedDescription)
-            let errorString = NSString(data: data, encoding: NSUTF8StringEncoding)
-            println("Error in Parsing \(errorString)")
-        } else {
-            if jsonDictionary != nil {
-                self.jsonResponse = jsonDictionary!
-                self.apiSearchForFoods = DataController.jsonAsUSDAIdAndNameSearchResults(jsonDictionary!)
-            } else {
-                let errorString = NSString(data: data, encoding: NSUTF8StringEncoding)
-                println("Error: could not parse JSON \(errorString)")
+        if selectedScopeButtonIndex == 0 {
+            var searchFoodName:String
+            if self.searchController.active {
+                searchFoodName = filteredSuggestedSearchFoods[indexPath.row]
             }
+            else {
+                searchFoodName = suggestedSearchFoods[indexPath.row]
+            }
+            self.searchController.searchBar.selectedScopeButtonIndex = 1
+            makeRequest(searchFoodName)
+        }
+        else if selectedScopeButtonIndex == 1 {
+            
+        }
+        else if selectedScopeButtonIndex == 2 {
+            
         }
         
-    })
+    }
     
-    task.resume()
-}
-
-
-
+    // MARK - UISearchResultsUpdating
+    
+    func updateSearchResultsForSearchController(searchController: UISearchController) {
+        let searchString = self.searchController.searchBar.text
+        let selectedScopeButtonIndex = self.searchController.searchBar.selectedScopeButtonIndex
+        self.filterContentForSearch(searchString, scope: selectedScopeButtonIndex)
+        self.tableView.reloadData()
+        
+    }
+    
+    // MARK- UISearchBarDelegate
+    
+    func searchBarSearchButtonClicked(searchBar: UISearchBar) {
+        self.searchController.searchBar.selectedScopeButtonIndex = 1
+        makeRequest(searchBar.text)
+    }
+    
+    func searchBar(searchBar: UISearchBar, selectedScopeButtonIndexDidChange selectedScope: Int) {
+        self.tableView.reloadData()
+    }
+    
+    func filterContentForSearch(searchText: String, scope: Int) {
+        self.filteredSuggestedSearchFoods = self.suggestedSearchFoods.filter({ (food : String) -> Bool in
+            var foodMatch = food.rangeOfString(searchText)
+            return foodMatch != nil
+        })
+    }
+    
+    func makeRequest (searchString: String) {
+        // How to make a HTTP get request
+        //
+        //        let url = NSURL(string: "https://api.nutritionix.com/v1_1/search/\(searchString)?results=0%3A20&cal_min=0&cal_max=50000&fields=item_name%2Cbrand_name%2Citem_id%2Cbrand_id&appId=\(kAppId)&appKey=\(kAppKey)")
+        //        let task = NSURLSession.sharedSession().dataTaskWithURL(url!, completionHandler: { (data, response, error) -> Void in
+        //
+        //            var stringData = NSString(data: data, encoding: NSUTF8StringEncoding)
+        //            println(stringData)
+        //            println(response)
+        //        })
+        //        task.resume()
+        
+        var request = NSMutableURLRequest(URL: NSURL(string: "https://api.nutritionix.com/v1_1/search/")!)
+        let session = NSURLSession.sharedSession()
+        request.HTTPMethod = "POST"
+        
+        var params = [
+            "appId" : kAppId,
+            "appKey" : kAppKey,
+            "fields" : ["item_name", "brand_name", "keywords", "usda_fields"],
+            "limit" : "50",
+            "query" : searchString,
+            "filters" : ["exists" : ["usda_fields" : "true"]]]
+        
+        var error: NSError?
+        request.HTTPBody = NSJSONSerialization.dataWithJSONObject(params, options: nil, error: &error)
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("applicaiton/json", forHTTPHeaderField: "Accept")
+        
+        var task = session.dataTaskWithRequest(request, completionHandler: { (data, response, err) -> Void in
+            
+            //            var stringData = NSString(data: data, encoding: NSUTF8StringEncoding)
+            //            println(stringData)
+            var conversionError: NSError?
+            var jsonDictionary = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableLeaves, error: &conversionError) as? NSDictionary
+            println(jsonDictionary)
+            
+            if conversionError != nil {
+                println(conversionError!.localizedDescription)
+                let errorString = NSString(data: data, encoding: NSUTF8StringEncoding)
+                println("Error in Parsing \(errorString)")
+            }
+            else {
+                if jsonDictionary != nil {
+                    self.jsonResponse = jsonDictionary!
+                    self.apiSearchForFoods = DataController.jsonAsUSDAIdAndNameSearchResults(jsonDictionary!)
+                    dispatch_async(dispatch_get_main_queue(), { () -> Void in
+                        self.tableView.reloadData()
+                    })
+                }
+                else {
+                    let errorString = NSString(data: data, encoding: NSUTF8StringEncoding)
+                    println("Error: could not parse JSON \(errorString)")
+                }
+            }
+            
+        })
+        
+        task.resume()
+    }
+    
+    
+    
 }
